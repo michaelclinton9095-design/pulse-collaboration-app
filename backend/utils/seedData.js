@@ -5,19 +5,19 @@ const bcrypt = require('bcryptjs');
 
 const initialChannels = [
   {
-    name: 'architecture-discussions',
+    name: 'general',
+    description: 'Company-wide updates, open discussions, and general collaboration.',
+    isPrivate: false,
+    createdBy: 'system'
+  },
+  {
+    name: 'engineering',
     description: 'System design, microservices latency, and distributed state coordination.',
     isPrivate: false,
     createdBy: 'system'
   },
   {
-    name: 'bug-triage-support',
-    description: 'Real-time incident response, root cause analysis, and production diagnostics.',
-    isPrivate: false,
-    createdBy: 'system'
-  },
-  {
-    name: 'release-coordination',
+    name: 'announcements',
     description: 'Deployment schedules, version bumps, and smoke testing verification.',
     isPrivate: false,
     createdBy: 'system'

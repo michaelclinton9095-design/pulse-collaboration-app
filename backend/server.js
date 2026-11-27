@@ -4,7 +4,15 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
+
+// Ensure uploads directories exist at boot
+const uploadDir = path.join(__dirname, 'uploads');
+['', 'voice', 'files'].forEach(sub => {
+  const d = path.join(uploadDir, sub);
+  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+});
 
 const { seedPulseIfEmpty } = require('./utils/seedData');
 const authRoutes = require('./routes/authRoutes');
@@ -29,13 +37,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Health check endpoint
+// Root & Health check endpoints (Passes Render / Railway / Cloud health probes)
+app.get('/', (req, res) => {
+  res.status(200).send('Pulse Real-Time Collaboration API is running');
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'Pulse Real-Time Messaging API',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    connectedSockets: typeof io !== 'undefined' && io.engine ? io.engine.clientsCount : 0,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'Pulse Real-Time Messaging API',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    connectedSockets: io.engine ? io.engine.clientsCount : 0,
+    connectedSockets: typeof io !== 'undefined' && io.engine ? io.engine.clientsCount : 0,
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
@@ -76,7 +98,7 @@ io.on('connection', (socket) => {
   // Send Message with database persistence before broadcast
   socket.on('message:send', async (messageData, ack) => {
     try {
-      const { roomId, sender, text, audioUrl, audioDuration, fileUrl, fileName, fileSize } = messageData;
+      const { roomId, sender, text, audioUrl, audioDuration, fileUrl, fileName, fileSize, clientId } = messageData;
 
       if (!roomId || !sender) {
         if (typeof ack === 'function') ack({ status: 'error', error: 'Missing room or sender' });
@@ -97,11 +119,17 @@ io.on('connection', (socket) => {
 
       await newMsg.save();
 
+      // Attach client ID for frontend optimistic deduplication
+      const broadcastMsg = newMsg.toObject();
+      if (clientId) {
+        broadcastMsg.clientId = clientId;
+      }
+
       // Broadcast to room
-      io.to(roomId).emit('message:new', newMsg);
+      io.to(roomId).emit('message:new', broadcastMsg);
 
       if (typeof ack === 'function') {
-        ack({ status: 'ok', message: newMsg });
+        ack({ status: 'ok', message: broadcastMsg });
       }
     } catch (err) {
       console.error('[Socket.IO] Message save error:', err);

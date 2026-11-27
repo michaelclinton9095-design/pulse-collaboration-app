@@ -18,10 +18,12 @@ export interface ChatRoom {
 
 export interface ChatMessage {
   id: string;
+  clientId?: string;
   roomId: string;
   sender: UserProfile;
   text: string;
   audioUrl?: string;
   fileUrl?: string;
   createdAt: string;
+  status?: 'sending' | 'sent' | 'read';
 }

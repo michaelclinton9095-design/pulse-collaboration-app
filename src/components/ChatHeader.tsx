@@ -11,7 +11,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onToggleMobileMenu,
   onOpenRoomInfo 
 }) => {
-  const { activeRoom, users } = useChat();
+  const { activeRoom, users, typingUser } = useChat();
 
   return (
     <header className="h-16 px-4 sm:px-6 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex items-center justify-between shrink-0">
@@ -33,9 +33,16 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             <h2 className="text-sm font-bold text-white tracking-tight truncate">
               {activeRoom.name}
             </h2>
-            <p className="text-[11px] text-slate-400 truncate hidden sm:block">
-              {activeRoom.description}
-            </p>
+            {typingUser ? (
+              <p className="text-[11px] text-emerald-400 font-semibold animate-pulse flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>{typingUser} is typing...</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-400 truncate hidden sm:block">
+                {activeRoom.description}
+              </p>
+            )}
           </div>
         </div>
       </div>

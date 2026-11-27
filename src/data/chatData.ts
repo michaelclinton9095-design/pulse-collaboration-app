@@ -35,57 +35,82 @@ export const sampleUsers: UserProfile[] = [
 
 export const initialRooms: ChatRoom[] = [
   {
-    id: 'room-architecture',
-    name: 'Architecture & System Design',
-    description: 'High-level discussions on distributed state, WebSocket resilience, and clean API models.',
+    id: 'room-general',
+    name: 'general',
+    description: 'Company-wide updates, open discussions, and general collaboration.',
     createdAt: '2026-11-01T08:00:00Z',
     unreadCount: 0
   },
   {
-    id: 'room-support-rca',
-    name: 'Production Support & RCA',
-    description: 'Live incident triage, root cause analysis breakdowns, and production performance logs.',
+    id: 'room-engineering',
+    name: 'engineering',
+    description: 'System design, microservices latency, and distributed WebSocket state coordination.',
     createdAt: '2026-11-05T12:00:00Z',
     unreadCount: 2
   },
   {
-    id: 'room-frontend',
-    name: 'Frontend & Tailwind UI',
-    description: 'Modern component libraries, React 19 hooks, and responsive design systems.',
+    id: 'room-announcements',
+    name: 'announcements',
+    description: 'Major platform releases, sprint milestones, and production notices.',
     createdAt: '2026-11-10T14:30:00Z',
     unreadCount: 0
   },
   {
-    id: 'room-lounge',
-    name: 'General Lounge',
-    description: 'Casual tech chats, freelance contract discussions, and open collaboration.',
+    id: 'room-support-rca',
+    name: 'support-and-rca',
+    description: 'Live incident triage, root cause analysis breakdowns, and performance logs.',
     createdAt: '2026-11-15T09:00:00Z',
     unreadCount: 0
   }
 ];
 
 export const initialMessages: Record<string, ChatMessage[]> = {
-  'room-architecture': [
+  'room-general': [
+    {
+      id: 'msg-g1',
+      roomId: 'room-general',
+      sender: sampleUsers[1],
+      text: 'Good morning team! Ready for the sprint review demo today?',
+      createdAt: '2026-11-27T09:00:00Z'
+    },
+    {
+      id: 'msg-g2',
+      roomId: 'room-general',
+      sender: currentUserDefault,
+      text: 'Good morning Sarah! All 4 ecosystem apps are up and passing health checks.',
+      createdAt: '2026-11-27T09:01:30Z'
+    }
+  ],
+  'room-engineering': [
     {
       id: 'msg-1',
-      roomId: 'room-architecture',
+      roomId: 'room-engineering',
       sender: sampleUsers[1],
       text: 'Hey team, what are your thoughts on pairing WebSocket event streams with optimistic client-side UI updates in our React frontend?',
-      createdAt: '2026-11-16T10:14:00Z'
+      createdAt: '2026-11-27T10:14:00Z'
     },
     {
       id: 'msg-2',
-      roomId: 'room-architecture',
+      roomId: 'room-engineering',
       sender: currentUserDefault,
-      text: 'Optimistic updates are essential for perceived latency! We append immediately with a pending state, and if the WebSocket socket heartbeat confirms acknowledgment, we flip it to synced. If it fails, we trigger an automatic retry with exponential backoff.',
-      createdAt: '2026-11-16T10:15:30Z'
+      text: 'Optimistic updates eliminate perceived latency! We append immediately with a pending state, and reconcile once the socket server acknowledges the message.',
+      createdAt: '2026-11-27T10:15:30Z'
     },
     {
       id: 'msg-3',
-      roomId: 'room-architecture',
+      roomId: 'room-engineering',
       sender: sampleUsers[2],
-      text: 'Agreed! That prevents the UI from feeling sluggish on high-latency mobile networks.',
-      createdAt: '2026-11-16T10:17:00Z'
+      text: 'Agreed! And the deduplication filter prevents duplicate speech or bubbles when both clients sync.',
+      createdAt: '2026-11-27T10:17:00Z'
+    }
+  ],
+  'room-announcements': [
+    {
+      id: 'msg-a1',
+      roomId: 'room-announcements',
+      sender: sampleUsers[2],
+      text: '📢 Notice: Pulse Real-Time Collaboration v2.4 successfully deployed to production.',
+      createdAt: '2026-11-27T08:30:00Z'
     }
   ],
   'room-support-rca': [
@@ -93,10 +118,11 @@ export const initialMessages: Record<string, ChatMessage[]> = {
       id: 'msg-4',
       roomId: 'room-support-rca',
       sender: sampleUsers[3],
-      text: 'We just reviewed the database timeout issue from yesterday. Adding compound indexes on (status, createdAt) brought query response time from 42s down to 35ms.',
-      createdAt: '2026-11-16T11:00:00Z'
-    },
-    {
+      text: 'We reviewed the database timeout issue from yesterday. Adding compound indexes brought query response time from 42s down to 35ms.',
+      createdAt: '2026-11-27T11:00:00Z'
+    }
+  ]
+};
       id: 'msg-5',
       roomId: 'room-support-rca',
       sender: currentUserDefault,

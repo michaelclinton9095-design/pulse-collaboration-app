@@ -3,7 +3,7 @@ import { useChat } from '../context/ChatContext';
 import { Send, Mic, Paperclip, Loader2, Square } from 'lucide-react';
 
 export const MessageComposer: React.FC = () => {
-  const { sendMessage, uploadVoice, uploadAttachment } = useChat();
+  const { sendMessage, uploadVoice, uploadAttachment, sendTyping } = useChat();
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -13,16 +13,30 @@ export const MessageComposer: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, []);
+
+  const handleTextChange = (val: string) => {
+    setText(val);
+    sendTyping(true);
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      sendTyping(false);
+    }, 2000);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (text.trim() && !isUploading) {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      sendTyping(false);
       sendMessage(text.trim());
       setText('');
     }
@@ -140,33 +154,33 @@ export const MessageComposer: React.FC = () => {
 
       <form
         onSubmit={handleSubmit}
-        className="flex items-end gap-2 bg-slate-900 border border-slate-800 rounded-2xl p-2 focus-within:border-sky-500 transition-colors"
+        className="flex items-center gap-2 bg-[#202c33] border border-white/10 rounded-2xl p-1.5 focus-within:border-emerald-500/50 transition-colors shadow-lg"
       >
         {/* Attachment button */}
         <button
           type="button"
           onClick={handleAttachmentClick}
           disabled={isUploading}
-          className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors shrink-0 disabled:opacity-50"
-          title="Attach File"
+          className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/5 transition-colors shrink-0 disabled:opacity-50"
+          title="Attach Document or Image"
         >
-          {isUploading ? <Loader2 className="w-4 h-4 animate-spin text-sky-400" /> : <Paperclip className="w-4 h-4" />}
+          {isUploading ? <Loader2 className="w-5 h-5 animate-spin text-emerald-400" /> : <Paperclip className="w-5 h-5" />}
         </button>
 
         {/* Text Input / Recording indicator */}
         {isRecording ? (
-          <div className="flex-1 flex items-center gap-2 py-1.5 px-2 text-xs text-rose-400">
+          <div className="flex-1 flex items-center gap-2 py-1.5 px-3 text-xs text-rose-400">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-            <span className="font-semibold">Recording voice note... ({recordingSeconds}s)</span>
+            <span className="font-semibold">Recording Voice Note... ({recordingSeconds}s)</span>
           </div>
         ) : (
           <textarea
             rows={1}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => handleTextChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message... (Enter to send)"
-            className="flex-1 bg-transparent text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none py-1.5 px-1 max-h-32"
+            placeholder="Type a message..."
+            className="flex-1 bg-transparent text-xs sm:text-sm text-slate-100 placeholder-slate-400 focus:outline-none resize-none py-2 px-2 max-h-32"
           />
         )}
 
@@ -175,24 +189,24 @@ export const MessageComposer: React.FC = () => {
           type="button"
           onClick={toggleVoiceRecording}
           disabled={isUploading}
-          className={`p-2 rounded-xl transition-colors shrink-0 ${
+          className={`p-2 rounded-full transition-colors shrink-0 ${
             isRecording
               ? 'bg-rose-600 text-white animate-pulse'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
           }`}
-          title={isRecording ? 'Stop & Send Recording' : 'Record Voice Note'}
+          title={isRecording ? 'Stop & Send Recording' : 'Voice Message'}
         >
-          {isRecording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          {isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
         </button>
 
-        {/* Send Button */}
+        {/* Send Button WhatsApp Style */}
         <button
           type="submit"
           disabled={!text.trim() || isUploading || isRecording}
-          className="p-2 rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 disabled:opacity-40 disabled:hover:bg-sky-600 text-white shadow-sm transition-all shrink-0"
-          title="Send Message"
+          className="p-2.5 rounded-full bg-[#00a884] hover:bg-[#029071] active:bg-[#007a5e] disabled:opacity-30 text-white shadow-md transition-all shrink-0"
+          title="Send (Enter)"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-4 h-4 ml-0.5" />
         </button>
       </form>
     </div>

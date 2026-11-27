@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { ChatRoom, ChatMessage, UserProfile } from '../types';
 import { initialRooms, initialMessages, sampleUsers, currentUserDefault } from '../data/chatData';
 
-const BACKEND_URL = 'http://localhost:5002';
+const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:5002';
 
 interface ChatContextType {
   currentUser: UserProfile;
@@ -20,6 +20,8 @@ interface ChatContextType {
   users: UserProfile[];
   isOnline: boolean;
   isFirebaseActive: boolean;
+  typingUser: string | null;
+  sendTyping: (isTyping: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -47,6 +49,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [users, setUsers] = useState<UserProfile[]>(sampleUsers);
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isFirebaseActive, setIsFirebaseActive] = useState<boolean>(true);
+  const [typingUser, setTypingUser] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -78,9 +81,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsOnline(navigator.onLine);
     });
 
+    socket.on('typing:start', ({ user, roomId }: { user: any; roomId: string }) => {
+      if (roomId === activeRoomId && user?.name !== currentUser.name) {
+        setTypingUser(user?.name || 'Someone');
+      }
+    });
+
+    socket.on('typing:stop', ({ roomId }: { roomId: string }) => {
+      if (roomId === activeRoomId) {
+        setTypingUser(null);
+      }
+    });
+
     socket.on('message:new', (newMsg: any) => {
       const formattedMsg: ChatMessage = {
         id: newMsg._id || newMsg.id || `msg-${Date.now()}`,
+        clientId: newMsg.clientId,
         roomId: newMsg.roomId,
         sender: newMsg.sender,
         text: newMsg.text || '',
@@ -91,9 +107,44 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setMessagesMap((prev) => {
         const roomMessages = prev[formattedMsg.roomId] || [];
+
+        // 1. If already present by database ID, skip
         if (roomMessages.some((m) => m.id === formattedMsg.id)) {
           return prev;
         }
+
+        // 2. If matching our optimistic message by clientId, reconcile it in-place
+        if (formattedMsg.clientId && roomMessages.some((m) => m.id === formattedMsg.clientId || m.clientId === formattedMsg.clientId)) {
+          return {
+            ...prev,
+            [formattedMsg.roomId]: roomMessages.map((m) =>
+              m.id === formattedMsg.clientId || m.clientId === formattedMsg.clientId
+                ? { ...formattedMsg, id: formattedMsg.id }
+                : m
+            ),
+          };
+        }
+
+        // 3. Fallback deduplication: same sender + exact text + sent within 3 seconds
+        const isDuplicateRecent = roomMessages.some(
+          (m) =>
+            m.sender?.id === formattedMsg.sender?.id &&
+            m.text === formattedMsg.text &&
+            Math.abs(new Date(m.createdAt).getTime() - new Date(formattedMsg.createdAt).getTime()) < 3500
+        );
+
+        if (isDuplicateRecent) {
+          // Reconcile ID if it was an optimistic temp message
+          return {
+            ...prev,
+            [formattedMsg.roomId]: roomMessages.map((m) =>
+              m.sender?.id === formattedMsg.sender?.id && m.text === formattedMsg.text && m.id.startsWith('msg-')
+                ? { ...formattedMsg, id: formattedMsg.id }
+                : m
+            ),
+          };
+        }
+
         return {
           ...prev,
           [formattedMsg.roomId]: [...roomMessages, formattedMsg],
@@ -331,6 +382,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const tempId = `msg-${Date.now()}`;
     const newMsg: ChatMessage = {
       id: tempId,
+      clientId: tempId,
       roomId: activeRoomId,
       sender: currentUser,
       text: text.trim(),
@@ -353,10 +405,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       fileUrl,
       fileName,
       fileSize,
+      clientId: tempId,
     };
 
     // Send via live Socket.IO if connected
     if (socketRef.current?.connected) {
+      socketRef.current.emit('typing:stop', { roomId: activeRoomId, user: currentUser });
       socketRef.current.emit('message:send', payload, (response: any) => {
         if (response?.status === 'ok' && response.message?._id) {
           setMessagesMap((prev) => ({
@@ -381,6 +435,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const sendTyping = (isTyping: boolean) => {
+    if (socketRef.current?.connected) {
+      if (isTyping) {
+        socketRef.current.emit('typing:start', { roomId: activeRoomId, user: currentUser });
+      } else {
+        socketRef.current.emit('typing:stop', { roomId: activeRoomId, user: currentUser });
+      }
+    }
+  };
+
   return (
     <ChatContext.Provider
       value={{
@@ -398,6 +462,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         users,
         isOnline,
         isFirebaseActive,
+        typingUser,
+        sendTyping,
       }}
     >
       {children}
