@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { upload, uploadVoice, uploadFile } = require('../controllers/uploadController');
 
-router.post('/voice', upload.single('voice'), uploadVoice);
-router.post('/file', upload.single('file'), uploadFile);
+// Support upload.any() to handle voice, audio, file, or document field names resiliently
+router.post('/voice', upload.any(), uploadVoice);
+router.post('/file', upload.any(), uploadFile);
 
 module.exports = router;

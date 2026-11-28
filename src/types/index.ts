@@ -5,6 +5,8 @@ export interface UserProfile {
   role?: string;
   status: 'online' | 'offline' | 'away';
   lastSeen?: string;
+  email?: string;
+  provider?: 'google' | 'guest' | 'local';
 }
 
 export interface ChatRoom {

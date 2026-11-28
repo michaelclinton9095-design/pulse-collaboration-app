@@ -120,9 +120,8 @@ export const initialMessages: Record<string, ChatMessage[]> = {
       sender: sampleUsers[3],
       text: 'We reviewed the database timeout issue from yesterday. Adding compound indexes brought query response time from 42s down to 35ms.',
       createdAt: '2026-11-27T11:00:00Z'
-    }
-  ]
-};
+    },
+    {
       id: 'msg-5',
       roomId: 'room-support-rca',
       sender: currentUserDefault,

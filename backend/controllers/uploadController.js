@@ -33,31 +33,35 @@ const upload = multer({
 });
 
 const uploadVoice = (req, res) => {
-  if (!req.file) {
+  const file = req.file || (req.files && (req.files.find(f => f.fieldname === 'voice' || f.fieldname === 'audio') || req.files[0]));
+  if (!file) {
     return res.status(400).json({ error: 'No audio file provided' });
   }
 
-  const fileUrl = `/uploads/voice/${req.file.filename}`;
+  const fileUrl = `/uploads/voice/${file.filename}`;
   res.status(201).json({
     success: true,
+    url: fileUrl,
     audioUrl: fileUrl,
-    filename: req.file.filename,
-    size: req.file.size
+    filename: file.filename,
+    size: file.size
   });
 };
 
 const uploadFile = (req, res) => {
-  if (!req.file) {
+  const file = req.file || (req.files && (req.files.find(f => f.fieldname === 'file' || f.fieldname === 'document') || req.files[0]));
+  if (!file) {
     return res.status(400).json({ error: 'No file provided' });
   }
 
-  const fileUrl = `/uploads/files/${req.file.filename}`;
+  const fileUrl = `/uploads/files/${file.filename}`;
   res.status(201).json({
     success: true,
-    fileUrl,
-    fileName: req.file.originalname,
-    fileSize: req.file.size,
-    mimetype: req.file.mimetype
+    url: fileUrl,
+    fileUrl: fileUrl,
+    fileName: file.originalname,
+    fileSize: file.size,
+    mimetype: file.mimetype
   });
 };
 

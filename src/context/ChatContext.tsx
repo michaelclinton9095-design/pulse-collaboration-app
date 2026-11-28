@@ -2,12 +2,15 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { io, Socket } from 'socket.io-client';
 import { ChatRoom, ChatMessage, UserProfile } from '../types';
 import { initialRooms, initialMessages, sampleUsers, currentUserDefault } from '../data/chatData';
+import { loginWithGoogle, logoutGoogle } from '../firebase';
 
 const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || 'http://localhost:5002';
 
 interface ChatContextType {
   currentUser: UserProfile;
   updateCurrentUser: (data: Partial<UserProfile>) => void;
+  signInWithGoogle: (accountIndex?: number) => Promise<void>;
+  signOut: () => Promise<void>;
   rooms: ChatRoom[];
   activeRoomId: string;
   activeRoom: ChatRoom;
@@ -38,7 +41,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [activeRoomId, setActiveRoomId] = useState<string>(() => {
-    return rooms[0]?.id || 'room-architecture';
+    return rooms[0]?.id || 'room-general';
   });
 
   const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(() => {
@@ -267,9 +270,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [messagesMap]);
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId) || rooms[0] || {
-    id: 'room-architecture',
-    name: 'architecture-core',
-    description: 'System design, event sourcing, and architecture discussions.',
+    id: 'room-general',
+    name: 'general',
+    description: 'Company-wide updates, open discussions, and general collaboration.',
     createdAt: new Date().toISOString(),
   };
 
@@ -330,9 +333,36 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const signInWithGoogle = async (accountIndex = 0) => {
+    try {
+      const googleUser = await loginWithGoogle(accountIndex);
+      setCurrentUser(googleUser);
+      localStorage.setItem('pulse_user', JSON.stringify(googleUser));
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('presence:update', { userId: googleUser.id, status: 'online' });
+      }
+    } catch (err) {
+      console.warn('Google sign-in error:', err);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      await logoutGoogle();
+      setCurrentUser(currentUserDefault);
+      localStorage.setItem('pulse_user', JSON.stringify(currentUserDefault));
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('presence:update', { userId: currentUserDefault.id, status: 'online' });
+      }
+    } catch (err) {
+      console.warn('Sign out error:', err);
+    }
+  };
+
   const uploadVoice = async (audioBlob: Blob): Promise<string | null> => {
     try {
       const formData = new FormData();
+      formData.append('voice', audioBlob, `voice-${Date.now()}.webm`);
       formData.append('audio', audioBlob, `voice-${Date.now()}.webm`);
       const res = await fetch(`${BACKEND_URL}/api/upload/voice`, {
         method: 'POST',
@@ -340,7 +370,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (res.ok) {
         const data = await res.json();
-        return `${BACKEND_URL}${data.url}`;
+        const urlPath = data.audioUrl || data.url;
+        if (urlPath) {
+          return urlPath.startsWith('http') ? urlPath : `${BACKEND_URL}${urlPath}`;
+        }
       }
     } catch (err) {
       console.warn('Audio upload failed:', err);
@@ -358,8 +391,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (res.ok) {
         const data = await res.json();
+        const urlPath = data.fileUrl || data.url;
+        const resolvedUrl = urlPath 
+          ? (urlPath.startsWith('http') ? urlPath : `${BACKEND_URL}${urlPath}`)
+          : URL.createObjectURL(file);
         return {
-          url: `${BACKEND_URL}${data.url}`,
+          url: resolvedUrl,
           name: data.fileName || file.name,
           size: data.fileSize || file.size,
         };
@@ -450,6 +487,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         currentUser,
         updateCurrentUser,
+        signInWithGoogle,
+        signOut,
         rooms,
         activeRoomId,
         activeRoom,

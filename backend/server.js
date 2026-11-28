@@ -95,7 +95,7 @@ io.on('connection', (socket) => {
     socket.leave(roomId);
   });
 
-  // Send Message with database persistence before broadcast
+  // Send Message with database persistence and resilient broadcast
   socket.on('message:send', async (messageData, ack) => {
     try {
       const { roomId, sender, text, audioUrl, audioDuration, fileUrl, fileName, fileSize, clientId } = messageData;
@@ -105,7 +105,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      const newMsg = new Message({
+      let broadcastMsg = {
+        _id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
         roomId,
         sender,
         text: text ? text.trim() : '',
@@ -114,25 +115,44 @@ io.on('connection', (socket) => {
         fileUrl,
         fileName,
         fileSize,
-        createdAt: new Date()
-      });
+        createdAt: new Date().toISOString()
+      };
 
-      await newMsg.save();
+      try {
+        const newMsg = new Message({
+          roomId,
+          sender,
+          text: text ? text.trim() : '',
+          audioUrl,
+          audioDuration,
+          fileUrl,
+          fileName,
+          fileSize,
+          createdAt: new Date()
+        });
+
+        // Persist to MongoDB if connected
+        if (mongoose.connection.readyState === 1) {
+          await newMsg.save();
+          broadcastMsg = newMsg.toObject();
+        }
+      } catch (dbErr) {
+        console.warn('[Socket.IO] DB save failed, broadcasting live message:', dbErr.message);
+      }
 
       // Attach client ID for frontend optimistic deduplication
-      const broadcastMsg = newMsg.toObject();
       if (clientId) {
         broadcastMsg.clientId = clientId;
       }
 
-      // Broadcast to room
+      // Always broadcast to room so real-time chat NEVER drops messages
       io.to(roomId).emit('message:new', broadcastMsg);
 
       if (typeof ack === 'function') {
         ack({ status: 'ok', message: broadcastMsg });
       }
     } catch (err) {
-      console.error('[Socket.IO] Message save error:', err);
+      console.error('[Socket.IO] Message handler error:', err);
       if (typeof ack === 'function') {
         ack({ status: 'error', error: err.message });
       }
@@ -150,7 +170,7 @@ io.on('connection', (socket) => {
 
   // Real-time presence updates
   socket.on('presence:update', async ({ userId, status }) => {
-    if (userId && userId.match(/^[0-9a-fA-F]{24}$/)) {
+    if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
       await User.findByIdAndUpdate(userId, { status, lastSeen: new Date() }).catch(() => {});
     }
     io.emit('presence:update', { userId, status });

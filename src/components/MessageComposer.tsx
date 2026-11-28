@@ -8,6 +8,7 @@ export const MessageComposer: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -53,10 +54,7 @@ export const MessageComposer: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFileUpload = async (file: File) => {
     setIsUploading(true);
     try {
       const result = await uploadAttachment(file);
@@ -71,6 +69,18 @@ export const MessageComposer: React.FC = () => {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await processFileUpload(file);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) await processFileUpload(file);
   };
 
   const startVoiceRecording = async () => {
@@ -143,7 +153,14 @@ export const MessageComposer: React.FC = () => {
   };
 
   return (
-    <div className="p-3 sm:p-4 bg-slate-950 border-t border-slate-800 shrink-0">
+    <div
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={handleDrop}
+      className={`p-3 sm:p-4 bg-slate-950 border-t border-slate-800 shrink-0 transition-colors ${
+        isDragging ? 'bg-emerald-950/40 border-emerald-500/50' : ''
+      }`}
+    >
       <input
         type="file"
         ref={fileInputRef}
@@ -152,10 +169,16 @@ export const MessageComposer: React.FC = () => {
         title="Upload Attachment"
       />
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex items-center gap-2 bg-[#202c33] border border-white/10 rounded-2xl p-1.5 focus-within:border-emerald-500/50 transition-colors shadow-lg"
-      >
+      {isDragging ? (
+        <div className="py-2.5 px-4 text-center rounded-2xl border-2 border-dashed border-emerald-400 bg-emerald-500/10 text-emerald-300 text-xs font-semibold animate-pulse flex items-center justify-center gap-2">
+          <Paperclip className="w-4 h-4" />
+          <span>Drop image or document here to attach &amp; send</span>
+        </div>
+      ) : (
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-center gap-2 bg-[#202c33] border border-white/10 rounded-2xl p-1.5 focus-within:border-emerald-500/50 transition-colors shadow-lg"
+        >
         {/* Attachment button */}
         <button
           type="button"
@@ -209,6 +232,7 @@ export const MessageComposer: React.FC = () => {
           <Send className="w-4 h-4 ml-0.5" />
         </button>
       </form>
-    </div>
-  );
+    )}
+  </div>
+);
 };
